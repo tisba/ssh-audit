@@ -215,7 +215,7 @@ class KexDH:  # pragma: nocover
                     ca_key_e, ca_key_e_len, ptr = KexDH.__get_bytes(ca_key, ptr)
 
                     # CA's modulus.  Bingo.
-                    ca_key_n, ca_key_n_len, ptr = KexDH.__get_bytes(ca_key, ptr, self.out)
+                    ca_key_n, ca_key_n_len, ptr = KexDH.__get_bytes(ca_key, ptr)
 
             else:
                 self.out.d("Certificate type %u found; this is not usually valid in the context of a host key!  Skipping it..." % cert_type)
