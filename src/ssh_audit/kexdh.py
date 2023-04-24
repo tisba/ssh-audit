@@ -136,7 +136,6 @@ class KexDH:  # pragma: nocover
         # ED25519 moduli are fixed at 32 bytes.
         if self.__hostkey_type == 'ssh-ed25519':
             self.out.d("%s has a fixed host key modulus of 32." % self.__hostkey_type)
-            self.__hostkey_n = 0
             self.__hostkey_n_len = 32
         else:
             # Here is the modulus size & actual modulus of the host key public key.
@@ -158,68 +157,67 @@ class KexDH:  # pragma: nocover
 
         # If this is a certificate, continue parsing to extract the CA type and key length.  Even though a hostkey type might be 'ssh-ed25519-cert-v01@openssh.com', its CA may still be RSA.
         # if hostkey_type.startswith('ssh-rsa-cert-v0') or hostkey_type.startswith('ssh-ed25519-cert-v0'):
-        if True:
-            self.out.d("Parsing CA for hostkey type [%s]..." % hostkey_type)
+        self.out.d("Parsing CA for hostkey type [%s]..." % hostkey_type)
 
-            # Skip over the serial number.
+        # Skip over the serial number.
+        ptr += 8
+
+        # Get the certificate type.
+        cert_type = int(binascii.hexlify(hostkey[ptr:ptr + 4]), 16)
+        ptr += 4
+
+        # Only SSH2_CERT_TYPE_HOST (2) makes sense in this context.
+        if cert_type == 2:
+
+            # Skip the key ID (this is the serial number of the
+            # certificate).
+            key_id, key_id_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
+
+            # The principles, which are... I don't know what.
+            principles, principles_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
+
+            # Skip over the timestamp that this certificate is valid after.
             ptr += 8
 
-            # Get the certificate type.
-            cert_type = int(binascii.hexlify(hostkey[ptr:ptr + 4]), 16)
-            ptr += 4
+            # Skip over the timestamp that this certificate is valid before.
+            ptr += 8
 
-            # Only SSH2_CERT_TYPE_HOST (2) makes sense in this context.
-            if cert_type == 2:
+            # TODO: validate the principles, and time range.
 
-                # Skip the key ID (this is the serial number of the
-                # certificate).
-                key_id, key_id_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+            # The critical options.
+            critical_options, critical_options_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
 
-                # The principles, which are... I don't know what.
-                principles, principles_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+            # Certificate extensions.
+            extensions, extensions_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
 
-                # Skip over the timestamp that this certificate is valid after.
-                ptr += 8
+            # Another nonce.
+            nonce, nonce_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
 
-                # Skip over the timestamp that this certificate is valid before.
-                ptr += 8
+            # Finally, we get to the CA key.
+            ca_key, ca_key_len, ptr = KexDH.__get_bytes(hostkey, ptr)  # pylint: disable=unused-variable
 
-                # TODO: validate the principles, and time range.
+            # Last in the host key blob is the CA signature.  It isn't
+            # interesting to us, so we won't bother parsing any further.
+            # The CA key has the modulus, however...
+            ptr = 0
 
-                # The critical options.
-                critical_options, critical_options_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+            # 'ssh-rsa', 'rsa-sha2-256', etc.
+            ca_key_type_bytes, ca_key_type_len, ptr = KexDH.__get_bytes(ca_key, ptr)  # pylint: disable=unused-variable
+            ca_key_type = ca_key_type_bytes.decode('ascii')
+            self.out.d("Found CA type: [%s]" % ca_key_type)
 
-                # Certificate extensions.
-                extensions, extensions_len, ptr = KexDH.__get_bytes(hostkey, ptr)
-
-                # Another nonce.
-                nonce, nonce_len, ptr = KexDH.__get_bytes(hostkey, ptr)
-
-                # Finally, we get to the CA key.
-                ca_key, ca_key_len, ptr = KexDH.__get_bytes(hostkey, ptr)
-
-                # Last in the host key blob is the CA signature.  It isn't
-                # interesting to us, so we won't bother parsing any further.
-                # The CA key has the modulus, however...
-                ptr = 0
-
-                # 'ssh-rsa', 'rsa-sha2-256', etc.
-                ca_key_type_bytes, ca_key_type_len, ptr = KexDH.__get_bytes(ca_key, ptr)
-                ca_key_type = ca_key_type_bytes.decode('ascii')
-                self.out.d("Found CA type: [%s]" % ca_key_type)
-
-                # ED25519 CA's don't explicitly include the modulus size in the public key, since its fixed at 32 in all cases.
-                if ca_key_type == 'ssh-ed25519':
-                    ca_key_n_len = 32
-                else:
-                    # CA's public key exponent.
-                    ca_key_e, ca_key_e_len, ptr = KexDH.__get_bytes(ca_key, ptr)
-
-                    # CA's modulus.  Bingo.
-                    ca_key_n, ca_key_n_len, ptr = KexDH.__get_bytes(ca_key, ptr)
-
+            # ED25519 CA's don't explicitly include the modulus size in the public key, since its fixed at 32 in all cases.
+            if ca_key_type == 'ssh-ed25519':
+                ca_key_n_len = 32
             else:
-                self.out.d("Certificate type %u found; this is not usually valid in the context of a host key!  Skipping it..." % cert_type)
+                # CA's public key exponent.
+                ca_key_e, ca_key_e_len, ptr = KexDH.__get_bytes(ca_key, ptr)  # pylint: disable=unused-variable
+
+                # CA's modulus.  Bingo.
+                ca_key_n, ca_key_n_len, ptr = KexDH.__get_bytes(ca_key, ptr)  # pylint: disable=unused-variable
+
+        else:
+            self.out.d("Certificate type %u found; this is not usually valid in the context of a host key!  Skipping it..." % cert_type)
 
         return ca_key_type, ca_key_n_len
 

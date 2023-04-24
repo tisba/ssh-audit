@@ -32,7 +32,7 @@ from ssh_audit.writebuf import WriteBuf
 
 
 class SSH2_Kex:
-    def __init__(self, outputbuffer: 'OutputBuffer', cookie: bytes, kex_algs: List[str], key_algs: List[str], cli: 'SSH2_KexParty', srv: 'SSH2_KexParty', follows: bool, unused: int = 0) -> None:
+    def __init__(self, outputbuffer: 'OutputBuffer', cookie: bytes, kex_algs: List[str], key_algs: List[str], cli: 'SSH2_KexParty', srv: 'SSH2_KexParty', follows: bool, unused: int = 0) -> None:  # pylint: disable=too-many-arguments
         self.__outputbuffer = outputbuffer
         self.__cookie = cookie
         self.__kex_algs = kex_algs

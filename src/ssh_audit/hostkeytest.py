@@ -198,18 +198,17 @@ class HostKeyTest:
 
                     # Keys smaller than 2048 result in a failure.  Keys smaller 3072 result in a warning.  Update the database accordingly.
                     if (cert is False) and (hostkey_modulus_size < key_min_good):
-                        if True:
-                            alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
+                        alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
 
-                            # Ensure that failure & warning lists exist.
-                            while len(alg_list) < 3:
-                                alg_list.append([])
+                        # Ensure that failure & warning lists exist.
+                        while len(alg_list) < 3:
+                            alg_list.append([])
 
-                            # If the key is under 2048, add to the failure list.
-                            if hostkey_modulus_size < key_min_warn:
-                                alg_list[1].append('using small %d-bit modulus' % hostkey_modulus_size)
-                            elif key_warn_str not in alg_list[2]:  # Issue a warning about 2048-bit moduli.
-                                alg_list[2].append(key_warn_str)
+                        # If the key is under 2048, add to the failure list.
+                        if hostkey_modulus_size < key_min_warn:
+                            alg_list[1].append('using small %d-bit modulus' % hostkey_modulus_size)
+                        elif key_warn_str not in alg_list[2]:  # Issue a warning about 2048-bit moduli.
+                            alg_list[2].append(key_warn_str)
 
                     elif (cert is True) and ((hostkey_modulus_size < key_min_good) or (ca_modulus_size > 0 and ca_modulus_size < key_min_good)):  # pylint: disable=chained-comparison
                         alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]

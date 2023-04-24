@@ -89,6 +89,7 @@ class Policy:
 
     }
 
+    WARNING_DEPRECATED_DIRECTIVES = "\nWARNING: this policy is using deprecated features.  Future versions of ssh-audit may remove support for them.  Re-generating the policy file is perhaps the most straight-forward way of resolving this issue.  Manually converting the 'hostkey_size_*', 'cakey_size_*', and 'dh_modulus_size_*' directives into the new format is another option.\n"
 
     def __init__(self, policy_file: Optional[str] = None, policy_data: Optional[str] = None, manual_load: bool = False) -> None:
         self._name: Optional[str] = None
@@ -203,7 +204,7 @@ class Policy:
                     self._macs = algs
 
             elif key.startswith('hostkey_size_'):  # Old host key size format.
-                old_format = True
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
 
                 hostkey_type = key[13:]
                 hostkey_size = int(val)
@@ -214,7 +215,7 @@ class Policy:
                 self._hostkey_sizes[hostkey_type] = {'hostkey_size': hostkey_size, 'ca_key_type': '', 'ca_key_size': 0}
 
             elif key.startswith('cakey_size_'):  # Old host key size format.
-                old_format = True
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
 
                 hostkey_type = key[11:]
                 ca_key_size = int(val)
@@ -241,7 +242,7 @@ class Policy:
                             self._hostkey_sizes[host_key_type]['raw_hostkey_bytes'] = b''
 
             elif key.startswith('dh_modulus_size_'):  # Old DH modulus format.
-                old_format = True
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
 
                 dh_type = key[16:]
                 dh_size = int(val)
