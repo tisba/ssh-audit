@@ -91,7 +91,7 @@ class Policy:
 
     WARNING_DEPRECATED_DIRECTIVES = "\nWARNING: this policy is using deprecated features.  Future versions of ssh-audit may remove support for them.  Re-generating the policy file is perhaps the most straight-forward way of resolving this issue.  Manually converting the 'hostkey_size_*', 'cakey_size_*', and 'dh_modulus_size_*' directives into the new format is another option.\n"
 
-    def __init__(self, policy_file: Optional[str] = None, policy_data: Optional[str] = None, manual_load: bool = False) -> None:
+    def __init__(self, policy_file: Optional[str] = None, policy_data: Optional[str] = None, manual_load: bool = False, json_output: bool = False) -> None:
         self._name: Optional[str] = None
         self._version: Optional[str] = None
         self._banner: Optional[str] = None
@@ -107,6 +107,12 @@ class Policy:
         self._server_policy = True
 
         self._name_and_version: str = ''
+
+        # If invoked while JSON output is expected, send warnings to stderr instead of stdout (which would corrupt the JSON output).
+        if json_output:
+            self._warning_target = sys.stderr
+        else:
+            self._warning_target = sys.stdout
 
         # Ensure that only one mode was specified.
         num_modes = 0
@@ -204,7 +210,7 @@ class Policy:
                     self._macs = algs
 
             elif key.startswith('hostkey_size_'):  # Old host key size format.
-                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES, file=self._warning_target)  # Warn the user that the policy file is using deprecated directives.
 
                 hostkey_type = key[13:]
                 hostkey_size = int(val)
@@ -215,7 +221,7 @@ class Policy:
                 self._hostkey_sizes[hostkey_type] = {'hostkey_size': hostkey_size, 'ca_key_type': '', 'ca_key_size': 0}
 
             elif key.startswith('cakey_size_'):  # Old host key size format.
-                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES, file=self._warning_target)  # Warn the user that the policy file is using deprecated directives.
 
                 hostkey_type = key[11:]
                 ca_key_size = int(val)
@@ -242,7 +248,7 @@ class Policy:
                             self._hostkey_sizes[host_key_type]['raw_hostkey_bytes'] = b''
 
             elif key.startswith('dh_modulus_size_'):  # Old DH modulus format.
-                print(Policy.WARNING_DEPRECATED_DIRECTIVES)  # Warn the user that the policy file is using deprecated directives.
+                print(Policy.WARNING_DEPRECATED_DIRECTIVES, file=self._warning_target)  # Warn the user that the policy file is using deprecated directives.
 
                 dh_type = key[16:]
                 dh_size = int(val)
@@ -494,12 +500,12 @@ macs = %s
 
 
     @staticmethod
-    def load_builtin_policy(policy_name: str) -> Optional['Policy']:
+    def load_builtin_policy(policy_name: str, json_output: bool = False) -> Optional['Policy']:
         '''Returns a Policy with the specified built-in policy name loaded, or None if no policy of that name exists.'''
         p = None
         if policy_name in Policy.BUILTIN_POLICIES:
             policy_struct = Policy.BUILTIN_POLICIES[policy_name]
-            p = Policy(manual_load=True)
+            p = Policy(manual_load=True, json_output=json_output)
             policy_name_without_version = policy_name[0:policy_name.rfind(' (')]
             p._name = policy_name_without_version  # pylint: disable=protected-access
             p._version = cast(str, policy_struct['version'])  # pylint: disable=protected-access

@@ -845,10 +845,10 @@ def process_commandline(out: OutputBuffer, args: List[str], usage_cb: Callable[.
     if (aconf.policy_file is not None) and (aconf.make_policy is False):
 
         # First, see if this is a built-in policy name.  If not, assume a file path was provided, and try to load it from disk.
-        aconf.policy = Policy.load_builtin_policy(aconf.policy_file)
+        aconf.policy = Policy.load_builtin_policy(aconf.policy_file, json_output=aconf.json)
         if aconf.policy is None:
             try:
-                aconf.policy = Policy(policy_file=aconf.policy_file)
+                aconf.policy = Policy(policy_file=aconf.policy_file, json_output=aconf.json)
             except Exception as e:
                 out.fail("Error while loading policy file: %s: %s" % (str(e), traceback.format_exc()))
                 out.write()
