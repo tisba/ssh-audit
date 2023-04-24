@@ -1,7 +1,7 @@
 """
    The MIT License (MIT)
 
-   Copyright (C) 2017-2021 Joe Testa (jtesta@positronsecurity.com)
+   Copyright (C) 2017-2023 Joe Testa (jtesta@positronsecurity.com)
    Copyright (C) 2017 Andris Raugulis (moo@arthepsy.eu)
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,6 +31,7 @@ import struct
 from typing import Dict, List, Set, Sequence, Tuple, Iterable  # noqa: F401
 from typing import Callable, Optional, Union, Any  # noqa: F401
 
+from ssh_audit.outputbuffer import OutputBuffer
 from ssh_audit.protocol import Protocol
 from ssh_audit.ssh_socket import SSH_Socket
 
@@ -52,7 +53,7 @@ class KexDH:  # pragma: nocover
         self.set_params(g, p)
 
         self.__ed25519_pubkey: Optional[bytes] = None  # pylint: disable=unused-private-member
-        self.__hostkey_type: ''
+        self.__hostkey_type = ''
         self.__hostkey_e = 0  # pylint: disable=unused-private-member
         self.__hostkey_n = 0  # pylint: disable=unused-private-member
         self.__hostkey_n_len = 0  # Length of the host key modulus.
@@ -135,7 +136,7 @@ class KexDH:  # pragma: nocover
         # ED25519 moduli are fixed at 32 bytes.
         if self.__hostkey_type == 'ssh-ed25519':
             self.out.d("%s has a fixed host key modulus of 32." % self.__hostkey_type)
-            self.__hostkey_n = b'\x00' * 32
+            self.__hostkey_n = 0
             self.__hostkey_n_len = 32
         else:
             # Here is the modulus size & actual modulus of the host key public key.
@@ -203,8 +204,8 @@ class KexDH:  # pragma: nocover
                 ptr = 0
 
                 # 'ssh-rsa', 'rsa-sha2-256', etc.
-                ca_key_type, ca_key_type_len, ptr = KexDH.__get_bytes(ca_key, ptr)
-                ca_key_type = ca_key_type.decode('ascii')
+                ca_key_type_bytes, ca_key_type_len, ptr = KexDH.__get_bytes(ca_key, ptr)
+                ca_key_type = ca_key_type_bytes.decode('ascii')
                 self.out.d("Found CA type: [%s]" % ca_key_type)
 
                 # ED25519 CA's don't explicitly include the modulus size in the public key, since its fixed at 32 in all cases.
@@ -330,8 +331,8 @@ class KexNISTP256(KexDH):
 
 
 class KexNISTP384(KexDH):
-    def __init__(self) -> None:
-        super(KexNISTP384, self).__init__('KexNISTP384', 'sha256', 0, 0)
+    def __init__(self, out: 'OutputBuffer') -> None:
+        super(KexNISTP384, self).__init__(out, 'KexNISTP384', 'sha256', 0, 0)
 
     # See comment for KexNISTP256.send_init().
     def send_init(self, s: 'SSH_Socket', init_msg: int = Protocol.MSG_KEXDH_INIT) -> None:
@@ -341,8 +342,8 @@ class KexNISTP384(KexDH):
 
 
 class KexNISTP521(KexDH):
-    def __init__(self) -> None:
-        super(KexNISTP521, self).__init__('KexNISTP521', 'sha256', 0, 0)
+    def __init__(self, out: 'OutputBuffer') -> None:
+        super(KexNISTP521, self).__init__(out, 'KexNISTP521', 'sha256', 0, 0)
 
     # See comment for KexNISTP256.send_init().
     def send_init(self, s: 'SSH_Socket', init_msg: int = Protocol.MSG_KEXDH_INIT) -> None:

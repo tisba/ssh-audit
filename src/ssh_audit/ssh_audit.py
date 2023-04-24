@@ -34,7 +34,7 @@ import traceback
 
 # pylint: disable=unused-import
 from typing import Dict, List, Set, Sequence, Tuple, Iterable  # noqa: F401
-from typing import Callable, Optional, Union, Any  # noqa: F401
+from typing import cast, Callable, Optional, Union, Any  # noqa: F401
 
 from ssh_audit.globals import SNAP_PACKAGE
 from ssh_audit.globals import SNAP_PERMISSIONS_ERROR
@@ -107,7 +107,7 @@ def usage(uout: OutputBuffer, err: Optional[str] = None) -> None:
     sys.exit(retval)
 
 
-def output_algorithms(out: OutputBuffer, title: str, alg_db: Dict[str, Dict[str, List[List[Optional[str]]]]], alg_type: str, algorithms: List[str], unknown_algs: List[str], is_json_output: bool, program_retval: int, maxlen: int = 0, host_keys: Dict[str, Dict[str, Union[bytes, str, int]]] = None, dh_modulus_sizes: Optional[Dict[str, Tuple[int, int]]] = None) -> int:  # pylint: disable=too-many-arguments
+def output_algorithms(out: OutputBuffer, title: str, alg_db: Dict[str, Dict[str, List[List[Optional[str]]]]], alg_type: str, algorithms: List[str], unknown_algs: List[str], is_json_output: bool, program_retval: int, maxlen: int = 0, host_keys: Optional[Dict[str, Dict[str, Union[bytes, str, int]]]] = None, dh_modulus_sizes: Optional[Dict[str, int]] = None) -> int:  # pylint: disable=too-many-arguments
     with out:
         for algorithm in algorithms:
             program_retval = output_algorithm(out, alg_db, alg_type, algorithm, unknown_algs, program_retval, maxlen, host_keys=host_keys, dh_modulus_sizes=dh_modulus_sizes)
@@ -119,7 +119,7 @@ def output_algorithms(out: OutputBuffer, title: str, alg_db: Dict[str, Dict[str,
     return program_retval
 
 
-def output_algorithm(out: OutputBuffer, alg_db: Dict[str, Dict[str, List[List[Optional[str]]]]], alg_type: str, alg_name: str, unknown_algs: List[str], program_retval: int, alg_max_len: int = 0, host_keys: Dict[str, Dict[str, Union[bytes, str, int]]] = None, dh_modulus_sizes: Optional[Dict[str, Tuple[int, int]]] = None) -> int:
+def output_algorithm(out: OutputBuffer, alg_db: Dict[str, Dict[str, List[List[Optional[str]]]]], alg_type: str, alg_name: str, unknown_algs: List[str], program_retval: int, alg_max_len: int = 0, host_keys: Optional[Dict[str, Dict[str, Union[bytes, str, int]]]] = None, dh_modulus_sizes: Optional[Dict[str, int]] = None) -> int:
     prefix = '(' + alg_type + ') '
     if alg_max_len == 0:
         alg_max_len = len(alg_name)
@@ -132,9 +132,9 @@ def output_algorithm(out: OutputBuffer, alg_db: Dict[str, Dict[str, List[List[Op
         alg_name_with_size = '%s (%u-bit)' % (alg_name, dh_modulus_sizes[alg_name])
         padding = padding[0:-11]
     elif (host_keys is not None) and (alg_name in host_keys):
-        hostkey_size = host_keys[alg_name]['hostkey_size']
-        ca_key_type = host_keys[alg_name]['ca_key_type']
-        ca_key_size = host_keys[alg_name]['ca_key_size']
+        hostkey_size = cast(int, host_keys[alg_name]['hostkey_size'])
+        ca_key_type = cast(str, host_keys[alg_name]['ca_key_type'])
+        ca_key_size = cast(int, host_keys[alg_name]['ca_key_size'])
 
         # If this is an RSA variant, just print "RSA".
         if ca_key_type in HostKeyTest.RSA_FAMILY:
@@ -311,7 +311,7 @@ def output_fingerprints(out: OutputBuffer, algs: Algorithms, is_json_output: boo
                 if host_keys[host_key_type] is None:
                     continue
 
-                fp = Fingerprint(host_keys[host_key_type]['raw_hostkey_bytes'])
+                fp = Fingerprint(cast(bytes, host_keys[host_key_type]['raw_hostkey_bytes']))
 
                 # Workaround for Python's order-indifference in dicts.  We might get a random RSA type (ssh-rsa, rsa-sha2-256, or rsa-sha2-512), so running the tool against the same server three times may give three different host key types here.  So if we have any RSA type, we will simply hard-code it to 'ssh-rsa'.
                 if host_key_type in HostKeyTest.RSA_FAMILY:
@@ -900,32 +900,32 @@ def build_struct(target_host: str, banner: Optional['Banner'], cves: List[Dict[s
         res['compression'] = kex.server.compression
 
         res['kex'] = []
-        alg_sizes = kex.dh_modulus_sizes()
+        dh_alg_sizes = kex.dh_modulus_sizes()
         for algorithm in kex.kex_algorithms:
             entry: Any = {
                 'algorithm': algorithm,
             }
-            if algorithm in alg_sizes:
-                hostkey_size = alg_sizes[algorithm]
+            if algorithm in dh_alg_sizes:
+                hostkey_size = dh_alg_sizes[algorithm]
                 entry['keysize'] = hostkey_size
             res['kex'].append(entry)
 
         res['key'] = []
-        alg_sizes = kex.host_keys()
+        host_keys = kex.host_keys()
         for algorithm in kex.key_algorithms:
             entry = {
                 'algorithm': algorithm,
             }
-            if algorithm in alg_sizes:
-                hostkey_info = alg_sizes[algorithm]
-                hostkey_size = hostkey_info['hostkey_size']
+            if algorithm in host_keys:
+                hostkey_info = host_keys[algorithm]
+                hostkey_size = cast(int, hostkey_info['hostkey_size'])
 
                 ca_type = ''
                 ca_size = 0
                 if 'ca_key_type' in hostkey_info:
-                    ca_type = hostkey_info['ca_key_type']
+                    ca_type = cast(str, hostkey_info['ca_key_type'])
                 if 'ca_key_size' in hostkey_info:
-                    ca_size = hostkey_info['ca_key_size']
+                    ca_size = cast(int, hostkey_info['ca_key_size'])
 
                 if algorithm in HostKeyTest.RSA_FAMILY or algorithm.startswith('ssh-rsa-cert-v0'):
                     entry['keysize'] = hostkey_size
@@ -950,7 +950,7 @@ def build_struct(target_host: str, banner: Optional['Banner'], cves: List[Dict[s
             if host_keys[host_key_type] is None:
                 continue
 
-            fp = Fingerprint(host_keys[host_key_type]['raw_hostkey_bytes'])
+            fp = Fingerprint(cast(bytes, host_keys[host_key_type]['raw_hostkey_bytes']))
 
             # Skip over certificate host types (or we would return invalid fingerprints).
             if '-cert-' in host_key_type:

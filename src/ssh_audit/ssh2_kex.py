@@ -22,16 +22,14 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
    THE SOFTWARE.
 """
-# pylint: disable=unused-import
-import json
-
-from typing import Dict, List, Set, Sequence, Tuple, Iterable  # noqa: F401
-from typing import Callable, Optional, Union, Any  # noqa: F401
+from typing import Dict, List
+from typing import Union
 
 from ssh_audit.outputbuffer import OutputBuffer
 from ssh_audit.readbuf import ReadBuf
 from ssh_audit.ssh2_kexparty import SSH2_KexParty
 from ssh_audit.writebuf import WriteBuf
+
 
 class SSH2_Kex:
     def __init__(self, outputbuffer: 'OutputBuffer', cookie: bytes, kex_algs: List[str], key_algs: List[str], cli: 'SSH2_KexParty', srv: 'SSH2_KexParty', follows: bool, unused: int = 0) -> None:
@@ -88,7 +86,7 @@ class SSH2_Kex:
         if key_type not in self.__host_keys:
             self.__host_keys[key_type] = {'raw_hostkey_bytes': raw_hostkey_bytes, 'hostkey_size': hostkey_size, 'ca_key_type': ca_key_type, 'ca_key_size': ca_key_size}
         else:  # A host key may only have one CA signature...
-            self.__outputbuffer.d("WARNING: called SSH2_Kex.set_host_key() multiple times with the same host key type (%s)!  Existing info: %d, %s, %d; Duplicate (ignored) info: %d, %s, %d" % (key_type, self.__host_keys[key_type]['hostkey_size'], self.__host_keys[key_type]['ca_key_type'], self.__host_keys[key_type]['ca_key_size'], hostkey_size, ca_key_type, ca_key_size))
+            self.__outputbuffer.d("WARNING: called SSH2_Kex.set_host_key() multiple times with the same host key type (%s)!  Existing info: %r, %r, %r; Duplicate (ignored) info: %r, %r, %r" % (key_type, self.__host_keys[key_type]['hostkey_size'], self.__host_keys[key_type]['ca_key_type'], self.__host_keys[key_type]['ca_key_size'], hostkey_size, ca_key_type, ca_key_size))
 
     def host_keys(self) -> Dict[str, Dict[str, Union[bytes, str, int]]]:
         return self.__host_keys

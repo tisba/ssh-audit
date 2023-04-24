@@ -28,7 +28,7 @@ from typing import Callable, Optional, Union, Any  # noqa: F401
 
 import traceback
 
-from ssh_audit.kexdh import KexDH, KexGroup1, KexGroup14_SHA1, KexGroup14_SHA256, KexCurve25519_SHA256, KexGroup16_SHA512, KexGroup18_SHA512, KexGroupExchange_SHA1, KexGroupExchange_SHA256, KexNISTP256, KexNISTP384, KexNISTP521
+from ssh_audit.kexdh import KexDH, KexDHException, KexGroup1, KexGroup14_SHA1, KexGroup14_SHA256, KexCurve25519_SHA256, KexGroup16_SHA512, KexGroup18_SHA512, KexGroupExchange_SHA1, KexGroupExchange_SHA256, KexNISTP256, KexNISTP384, KexNISTP521
 from ssh_audit.ssh2_kex import SSH2_Kex
 from ssh_audit.ssh2_kexdb import SSH2_KexDB
 from ssh_audit.ssh_socket import SSH_Socket
@@ -129,7 +129,6 @@ class HostKeyTest:
                 out.d('Preparing to obtain ' + host_key_type + ' host key...', write_now=True)
 
                 cert = host_key_types[host_key_type]['cert']
-                variable_key_len = host_key_types[host_key_type]['variable_key_len']
 
                 # If the connection is closed, re-open it and get the kex again.
                 if not s.is_connected():
@@ -160,10 +159,14 @@ class HostKeyTest:
                 kex_group.send_init(s)
                 raw_hostkey_bytes = b''
                 try:
-                    raw_hostkey_bytes = kex_group.recv_reply(s)
-                except Exception:
+                    kex_reply = kex_group.recv_reply(s)
+                    raw_hostkey_bytes = kex_reply if kex_reply is not None else b''
+                except KexDHException:
                     out.v("Failed to parse server's host key.  Stack trace:\n%s" % str(traceback.format_exc()), write_now=True)
-                    pass
+
+                    # Since parsing this host key failed, there's nothing more to do but close the socket and move on to the next host key type.
+                    s.close()
+                    continue
 
                 hostkey_modulus_size = kex_group.get_hostkey_size()
                 ca_type = kex_group.get_ca_type()
@@ -195,9 +198,8 @@ class HostKeyTest:
 
                     # Keys smaller than 2048 result in a failure.  Keys smaller 3072 result in a warning.  Update the database accordingly.
                     if (cert is False) and (hostkey_modulus_size < key_min_good):
-                        # for rsa_type in HostKeyTest.RSA_FAMILY:
                         if True:
-                            alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]  #rsa_type]
+                            alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
 
                             # Ensure that failure & warning lists exist.
                             while len(alg_list) < 3:

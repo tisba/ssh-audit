@@ -30,10 +30,9 @@ from typing import Optional, Any, Union, cast
 from datetime import date
 
 from ssh_audit import exitcodes
-from ssh_audit.banner import Banner  # pylint: disable=unused-import
+from ssh_audit.banner import Banner
 from ssh_audit.globals import SNAP_PACKAGE, SNAP_PERMISSIONS_ERROR
-from ssh_audit.hostkeytest import HostKeyTest
-from ssh_audit.ssh2_kex import SSH2_Kex  # pylint: disable=unused-import
+from ssh_audit.ssh2_kex import SSH2_Kex
 
 
 # Validates policy files and performs policy testing
@@ -101,8 +100,8 @@ class Policy:
         self._kex: Optional[List[str]] = None
         self._ciphers: Optional[List[str]] = None
         self._macs: Optional[List[str]] = None
-        self._hostkey_sizes: Optional[Dict[str, int]] = None
-        #self._cakey_sizes: Optional[Dict[str, int]] = None
+        self._hostkey_sizes: Optional[Dict[str, Dict[str, Union[int, str, bytes]]]] = None
+        self._cakey_sizes: Optional[Dict[str, int]] = None
         self._dh_modulus_sizes: Optional[Dict[str, int]] = None
         self._server_policy = True
 
@@ -224,19 +223,22 @@ class Policy:
                 if hostkey_type in ['ssh-rsa-cert-v01@openssh.com', 'rsa-sha2-256-cert-v01@openssh.com', 'rsa-sha2-512-cert-v01@openssh.com']:
                     ca_key_type = 'ssh-rsa'
 
+                if self._hostkey_sizes is None:
+                    self._hostkey_sizes = {}
                 self._hostkey_sizes[hostkey_type] = {'hostkey_size': hostkey_size, 'ca_key_type': ca_key_type, 'ca_key_size': ca_key_size}
 
             elif key == 'host_key_sizes':  # New host key size format.
                 self._hostkey_sizes = json.loads(val)
 
                 # Fill in the trimmed fields that were omitted from the policy.
-                for host_key_type in self._hostkey_sizes:
-                    if 'ca_key_type' not in self._hostkey_sizes[host_key_type]:
-                        self._hostkey_sizes[host_key_type]['ca_key_type'] = ''
-                    if 'ca_key_size' not in self._hostkey_sizes[host_key_type]:
-                        self._hostkey_sizes[host_key_type]['ca_key_size'] = 0
-                    if 'raw_hostkey_bytes' not in self._hostkey_sizes[host_key_type]:
-                        self._hostkey_sizes[host_key_type]['raw_hostkey_bytes'] = b''
+                if self._hostkey_sizes is not None:
+                    for host_key_type in self._hostkey_sizes:
+                        if 'ca_key_type' not in self._hostkey_sizes[host_key_type]:
+                            self._hostkey_sizes[host_key_type]['ca_key_type'] = ''
+                        if 'ca_key_size' not in self._hostkey_sizes[host_key_type]:
+                            self._hostkey_sizes[host_key_type]['ca_key_size'] = 0
+                        if 'raw_hostkey_bytes' not in self._hostkey_sizes[host_key_type]:
+                            self._hostkey_sizes[host_key_type]['raw_hostkey_bytes'] = b''
 
             elif key.startswith('dh_modulus_size_'):  # Old DH modulus format.
                 old_format = True
@@ -283,10 +285,9 @@ class Policy:
         kex_algs = None
         ciphers = None
         macs = None
-        rsa_hostkey_sizes_str = ''
-        rsa_cakey_sizes_str = ''
         dh_modulus_sizes_str = ''
         client_policy_str = ''
+        host_keys_json = ''
 
         if client_audit:
             client_policy_str = "\n# Set to true to signify this is a policy for clients, not servers.\nclient policy = true\n"
@@ -397,11 +398,11 @@ macs = %s
                         self._append_error(errors, 'Host key (%s) sizes' % hostkey_type, [str(expected_hostkey_size)], None, [str(actual_hostkey_size)])
 
                     # If we have expected CA signatures set, check them against what the server returned.
-                    if len(self._hostkey_sizes[hostkey_type]['ca_key_type']) > 0 and self._hostkey_sizes[hostkey_type]['ca_key_size'] > 0:
-                        expected_ca_key_type = self._hostkey_sizes[hostkey_type]['ca_key_type']
-                        expected_ca_key_size = self._hostkey_sizes[hostkey_type]['ca_key_size']
-                        actual_ca_key_type = server_host_keys[hostkey_type]['ca_key_type']
-                        actual_ca_key_size = server_host_keys[hostkey_type]['ca_key_size']
+                    if self._hostkey_sizes is not None and len(cast(str, self._hostkey_sizes[hostkey_type]['ca_key_type'])) > 0 and cast(int, self._hostkey_sizes[hostkey_type]['ca_key_size']) > 0:
+                        expected_ca_key_type = cast(str, self._hostkey_sizes[hostkey_type]['ca_key_type'])
+                        expected_ca_key_size = cast(int, self._hostkey_sizes[hostkey_type]['ca_key_size'])
+                        actual_ca_key_type = cast(str, server_host_keys[hostkey_type]['ca_key_type'])
+                        actual_ca_key_size = cast(int, server_host_keys[hostkey_type]['ca_key_size'])
 
                         # Ensure that the CA signature type is what's expected (i.e.: the server doesn't have an RSA sig when we're expecting an ED25519 sig).
                         if actual_ca_key_type != expected_ca_key_type:
@@ -508,7 +509,7 @@ macs = %s
             p._kex = cast(Optional[List[str]], policy_struct['kex'])  # pylint: disable=protected-access
             p._ciphers = cast(Optional[List[str]], policy_struct['ciphers'])  # pylint: disable=protected-access
             p._macs = cast(Optional[List[str]], policy_struct['macs'])  # pylint: disable=protected-access
-            p._hostkey_sizes = cast(Optional[Dict[str, int]], policy_struct['hostkey_sizes'])  # pylint: disable=protected-access
+            p._hostkey_sizes = cast(Optional[Dict[str, Dict[str, Union[int, str, bytes]]]], policy_struct['hostkey_sizes'])  # pylint: disable=protected-access
             p._cakey_sizes = cast(Optional[Dict[str, int]], policy_struct['cakey_sizes'])  # pylint: disable=protected-access
             p._dh_modulus_sizes = cast(Optional[Dict[str, int]], policy_struct['dh_modulus_sizes'])  # pylint: disable=protected-access
             p._server_policy = cast(bool, policy_struct['server_policy'])  # pylint: disable=protected-access
