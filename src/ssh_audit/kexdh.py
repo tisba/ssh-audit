@@ -94,21 +94,9 @@ class KexDH:  # pragma: nocover
             self.out.d("KexDH.recv_reply(): received packge_type == -1.")
             return None
 
-        hostkey_len = 0  # pylint: disable=unused-variable
-        hostkey_type_len = hostkey_e_len = 0  # pylint: disable=unused-variable
-        key_id_len = principles_len = 0  # pylint: disable=unused-variable
-        critical_options_len = extensions_len = 0  # pylint: disable=unused-variable
-        nonce_len = ca_key_len = ca_key_type_len = 0  # pylint: disable=unused-variable
-        ca_key_len = ca_key_type_len = ca_key_e_len = 0  # pylint: disable=unused-variable
-
-        key_id = principles = None  # pylint: disable=unused-variable
-        critical_options = extensions = None  # pylint: disable=unused-variable
-        nonce = ca_key = ca_key_type = None  # pylint: disable=unused-variable
-        ca_key_e = ca_key_n = None  # pylint: disable=unused-variable
-
         # Get the host key blob, F, and signature.
         ptr = 0
-        hostkey, hostkey_len, ptr = KexDH.__get_bytes(payload, ptr)
+        hostkey, _, ptr = KexDH.__get_bytes(payload, ptr)
 
         # If we are not supposed to parse the host key size (i.e.: it is a type that is of fixed size such as ed25519), then stop here.
         if not parse_host_key_size:
@@ -120,17 +108,17 @@ class KexDH:  # pragma: nocover
         # Now pick apart the host key blob.
         # Get the host key type (i.e.: 'ssh-rsa', 'ssh-ed25519', etc).
         ptr = 0
-        hostkey_type, hostkey_type_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+        hostkey_type, _, ptr = KexDH.__get_bytes(hostkey, ptr)
         self.__hostkey_type = hostkey_type.decode('ascii')
         self.out.d("Parsing host key type: %s" % self.__hostkey_type)
 
         # If this is an RSA certificate, skip over the nonce.
         if self.__hostkey_type.startswith('ssh-rsa-cert-v0'):
             self.out.d("RSA certificate found, so skipping nonce.")
-            nonce, nonce_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+            _, _, ptr = KexDH.__get_bytes(hostkey, ptr)  # Read & skip over the nonce.
 
         # The public key exponent.
-        hostkey_e, hostkey_e_len, ptr = KexDH.__get_bytes(hostkey, ptr)
+        hostkey_e, _, ptr = KexDH.__get_bytes(hostkey, ptr)
         self.__hostkey_e = int(binascii.hexlify(hostkey_e), 16)  # pylint: disable=unused-private-member
 
         # ED25519 moduli are fixed at 32 bytes.
