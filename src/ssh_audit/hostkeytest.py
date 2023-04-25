@@ -169,17 +169,17 @@ class HostKeyTest:
                     continue
 
                 hostkey_modulus_size = kex_group.get_hostkey_size()
-                ca_type = kex_group.get_ca_type()
+                ca_key_type = kex_group.get_ca_type()
                 ca_modulus_size = kex_group.get_ca_size()
-                out.d("Hostkey type: [%s]; hostkey size: %u; CA type: [%s]; CA modulus size: %u" % (host_key_type, hostkey_modulus_size, ca_type, ca_modulus_size), write_now=True)
+                out.d("Hostkey type: [%s]; hostkey size: %u; CA type: [%s]; CA modulus size: %u" % (host_key_type, hostkey_modulus_size, ca_key_type, ca_modulus_size), write_now=True)
 
                 # Record all the host key info.
-                server_kex.set_host_key(host_key_type, raw_hostkey_bytes, hostkey_modulus_size, ca_type, ca_modulus_size)
+                server_kex.set_host_key(host_key_type, raw_hostkey_bytes, hostkey_modulus_size, ca_key_type, ca_modulus_size)
 
                 # Set the hostkey size for all RSA key types since 'ssh-rsa', 'rsa-sha2-256', etc. are all using the same host key.  Note, however, that this may change in the future.
                 if cert is False and host_key_type in HostKeyTest.RSA_FAMILY:
                     for rsa_type in HostKeyTest.RSA_FAMILY:
-                        server_kex.set_host_key(rsa_type, raw_hostkey_bytes, hostkey_modulus_size, ca_type, ca_modulus_size)
+                        server_kex.set_host_key(rsa_type, raw_hostkey_bytes, hostkey_modulus_size, ca_key_type, ca_modulus_size)
 
                 # Close the socket, as the connection has
                 # been put in a state that later tests can't use.
@@ -188,16 +188,20 @@ class HostKeyTest:
                 # If the host key modulus or CA modulus was successfully parsed, check to see that its a safe size.
                 if hostkey_modulus_size > 0 or ca_modulus_size > 0:
                     # The minimum good modulus size for RSA host keys is 3072.  However, since ECC cryptosystems are fundamentally different, the minimum good is 256.
-                    key_min_good = 3072
-                    key_min_warn = 2048
-                    key_warn_str = HostKeyTest.TWO2K_MODULUS_WARNING
+                    hostkey_min_good = cakey_min_good = 3072
+                    hostkey_min_warn = cakey_min_warn = 2048
+                    hostkey_warn_str = cakey_warn_str = HostKeyTest.TWO2K_MODULUS_WARNING
                     if host_key_type.startswith('ssh-ed25519') or host_key_type.startswith('ecdsa-sha2-nistp'):
-                        key_min_good = 256
-                        key_min_warn = 224
-                        key_warn_str = HostKeyTest.SMALL_ECC_MODULUS_WARNING
+                        hostkey_min_good = 256
+                        hostkey_min_warn = 224
+                        hostkey_warn_str = HostKeyTest.SMALL_ECC_MODULUS_WARNING
+                    if ca_key_type.startswith('ssh-ed25519') or host_key_type.startswith('ecdsa-sha2-nistp'):
+                        cakey_min_good = 256
+                        cakey_min_warn = 224
+                        cakey_warn_str = HostKeyTest.SMALL_ECC_MODULUS_WARNING
 
                     # Keys smaller than 2048 result in a failure.  Keys smaller 3072 result in a warning.  Update the database accordingly.
-                    if (cert is False) and (hostkey_modulus_size < key_min_good):
+                    if (cert is False) and (hostkey_modulus_size < hostkey_min_good):
                         alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
 
                         # Ensure that failure & warning lists exist.
@@ -205,26 +209,31 @@ class HostKeyTest:
                             alg_list.append([])
 
                         # If the key is under 2048, add to the failure list.
-                        if hostkey_modulus_size < key_min_warn:
+                        if hostkey_modulus_size < hostkey_min_warn:
                             alg_list[1].append('using small %d-bit modulus' % hostkey_modulus_size)
-                        elif key_warn_str not in alg_list[2]:  # Issue a warning about 2048-bit moduli.
-                            alg_list[2].append(key_warn_str)
+                        elif hostkey_warn_str not in alg_list[2]:  # Issue a warning about 2048-bit moduli.
+                            alg_list[2].append(hostkey_warn_str)
 
-                    elif (cert is True) and ((hostkey_modulus_size < key_min_good) or (ca_modulus_size > 0 and ca_modulus_size < key_min_good)):  # pylint: disable=chained-comparison
+                    elif (cert is True) and ((hostkey_modulus_size < hostkey_min_good) or (ca_modulus_size > 0 and ca_modulus_size < cakey_min_good)):  # pylint: disable=chained-comparison
                         alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
-                        min_modulus = min(hostkey_modulus_size, ca_modulus_size)
-                        min_modulus = min_modulus if min_modulus > 0 else max(hostkey_modulus_size, ca_modulus_size)
 
                         # Ensure that failure & warning lists exist.
                         while len(alg_list) < 3:
                             alg_list.append([])
 
-                        # If the key is smaller than 2048-bit/224-bit, flag this as a failure.
-                        if (hostkey_modulus_size < key_min_warn) or (ca_modulus_size > 0 and ca_modulus_size < key_min_warn):  # pylint: disable=chained-comparison
-                            alg_list[1].append('using small %d-bit modulus' % min_modulus)
-                        # Otherwise, flag this as a warning.
-                        elif key_warn_str not in alg_list[2]:
-                            alg_list[2].append(key_warn_str)
+                        # If the host key is smaller than 2048-bit/224-bit, flag this as a failure.
+                        if hostkey_modulus_size < hostkey_min_warn:
+                            alg_list[1].append('using small %d-bit hostkey modulus' % hostkey_modulus_size)
+                        # Otherwise, this is just a warning.
+                        elif (hostkey_modulus_size < hostkey_min_good) and (hostkey_warn_str not in alg_list[2]):
+                            alg_list[2].append(hostkey_warn_str)
+
+                        # If the CA key is smaller than 2048-bit/224-bit, flag this as a failure.
+                        if 0 < ca_modulus_size < cakey_min_warn:
+                            alg_list[1].append('using small %d-bit CA key modulus' % ca_modulus_size)
+                        # Otherwise, this is just a warning.
+                        elif (0 < ca_modulus_size < cakey_min_good) and (cakey_warn_str not in alg_list[2]):
+                            alg_list[2].append(cakey_warn_str)
 
                 # If this host key type is in the RSA family, then mark them all as parsed (since results in one are valid for them all).
                 if host_key_type in HostKeyTest.RSA_FAMILY:

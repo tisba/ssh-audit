@@ -79,6 +79,14 @@ class KexDH:  # pragma: nocover
     # contains the host key, among other things.  Function returns the host
     # key blob (from which the fingerprint can be calculated).
     def recv_reply(self, s: 'SSH_Socket', parse_host_key_size: bool = True) -> Optional[bytes]:
+        # Reset the CA info, in case it was set from a prior invokation.
+        self.__hostkey_type = ''
+        self.__hostkey_e = 0  # pylint: disable=unused-private-member
+        self.__hostkey_n = 0  # pylint: disable=unused-private-member
+        self.__hostkey_n_len = 0
+        self.__ca_key_type = ''
+        self.__ca_n_len = 0
+
         packet_type, payload = s.read_packet(2)
 
         # Skip any & all MSG_DEBUG messages.
@@ -132,7 +140,6 @@ class KexDH:  # pragma: nocover
 
         # If this is a certificate, continue parsing to extract the CA type and key length.  Even though a hostkey type might be 'ssh-ed25519-cert-v01@openssh.com', its CA may still be RSA.
         if self.__hostkey_type.startswith('ssh-rsa-cert-v0') or self.__hostkey_type.startswith('ssh-ed25519-cert-v0'):
-
             # Get the CA key type and key length.
             self.__ca_key_type, self.__ca_n_len = self.__parse_ca_key(hostkey, self.__hostkey_type, ptr)
             self.out.d("KexDH.__parse_ca_key(): CA key type: [%s]; CA key length: %u" % (self.__ca_key_type, self.__ca_n_len))
