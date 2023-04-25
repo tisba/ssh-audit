@@ -57,24 +57,6 @@ class HostKeyTest:
     TWO2K_MODULUS_WARNING = '2048-bit modulus only provides 112-bits of symmetric strength'
     SMALL_ECC_MODULUS_WARNING = '224-bit ECC modulus only provides 112-bits of symmetric strength'
 
-    '''
-    @staticmethod
-    def __add_fail_message(host_key_type: str, fail_message: str, recurse = False):
-        alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
-
-        # If no failure list exists, add an empty failure list.
-        if len(alg_list) < 2:
-            alg_list.append([])
-
-        # Only append this failure message if it isn't in the list already.
-        if fail_message not in alg_list[1]:
-            alg_list[1].append(fail_message)
-
-        # Recurse only one level deep, and set the same fail message for all RSA host key types (if this affects one of them)
-        if (recurse is False) and (host_key_type in HostKeyTest.RSA_FAMILY):
-                for rsa_type in HostKeyTest.RSA_FAMILY:
-                    HostKeyTest.__add_fail_message(rsa_type, fail_message, True)
-    '''
 
     @staticmethod
     def run(out: 'OutputBuffer', s: 'SSH_Socket', server_kex: 'SSH2_Kex') -> None:
