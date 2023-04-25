@@ -196,7 +196,7 @@ class HostKeyTest:
                         elif hostkey_warn_str not in alg_list[2]:  # Issue a warning about 2048-bit moduli.
                             alg_list[2].append(hostkey_warn_str)
 
-                    elif (cert is True) and ((hostkey_modulus_size < hostkey_min_good) or (ca_modulus_size > 0 and ca_modulus_size < cakey_min_good)):  # pylint: disable=chained-comparison
+                    elif (cert is True) and ((hostkey_modulus_size < hostkey_min_good) or (0 < ca_modulus_size < cakey_min_good)):
                         alg_list = SSH2_KexDB.ALGORITHMS['key'][host_key_type]
 
                         # Ensure that failure & warning lists exist.
